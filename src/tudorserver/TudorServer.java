@@ -34,6 +34,6 @@ public class TudorServer {
 	}
 
 	public static void main(String[] args) {
-		new TudorServer();
+		new TudorServer(0);
 	}
 }

@@ -2,6 +2,8 @@ package tudorserver;
 
 import java.net.InetAddress;
 
+import database.AppInfo;
+
 public class ServerClient {
 
 	private int playerID;
@@ -14,20 +16,16 @@ public class ServerClient {
 	public OnlineStatus onlineStatus = OnlineStatus.IN_GAME;
 	public long timeItEnteredLobby;
 
-	public ServerClient(int playerID, String playerName, InetAddress clientAddress, int clientPort) {
+	public ServerClient(int playerID, InetAddress clientAddress, int clientPort) {
 
 		this.playerID = playerID;
-		this.playerName = playerName;
+		this.playerName = AppInfo.getPlayerNameByID(playerID);
 		this.playerX = this.playerY = 100;
 
 		this.clientAddress = clientAddress;
 		this.clientPort = clientPort;
 		this.status = OnlineStatus.ONLINE;
 		this.onlineStatus = OnlineStatus.IN_GAME;
-	}
-	
-	public int getOutFromLobbyTimeInSeconds(long currentTime) {
-		return (int) ((currentTime - timeItEnteredLobby) / 1000000000);
 	}
 
 	public void setOnlineStatus(OnlineStatus status) {

@@ -8,6 +8,8 @@ import java.net.SocketException;
 import java.util.HashSet;
 import java.util.Set;
 
+import game.DataProcessor;
+
 public class Server { // 1 server, 1 lobby
 
 	private int serverPort;
@@ -66,8 +68,8 @@ public class Server { // 1 server, 1 lobby
 		
 		byte[] data = packet.getData();
 		
-//		DataProcessor dataProcessor=new DataProcessor(data);
-//		dataProcessor.processData();
+		DataProcessor dataProcessor=new DataProcessor(data);
+		dataProcessor.processData();
 		
 		InetAddress address=packet.getAddress();
 		int clientPort = packet.getPort();
@@ -83,13 +85,16 @@ public class Server { // 1 server, 1 lobby
 		InetAddress address=packet.getAddress();
 		int clientPort = packet.getPort();
 		
-		System.out.println("------------------------------");
-		System.out.println("PACKET:");
-		System.out.println("\t Host Address -> " + address.getHostAddress() + "  :  Client Port  ->  " + clientPort);
-		System.out.println();
-		System.out.println("\tContents:");
-		System.out.println("\t\t" + new String(data));
-		System.out.println("------------------------------");
+//		System.out.println("------------------------------");
+//		System.out.println("PACKET:");
+//		System.out.println("\t Host Address -> " + address.getHostAddress() + "  :  Client Port  ->  " + clientPort);
+//		System.out.println();
+//		System.out.println("\tContents:");
+//		System.out.println("\t\t" + new String(data));
+//		System.out.println("------------------------------");
+		
+		// System.out.println("\t\t" + new String(data));	
+		System.out.println("\t\t" + data[2]+" " + data[1] +" "+ data[0]);	
 	}
 
 	public void send(byte[] data, InetAddress address, int port) {

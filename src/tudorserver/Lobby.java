@@ -17,10 +17,10 @@ import java.net.DatagramPacket;
 import java.net.DatagramSocket;
 import java.net.InetAddress;
 import java.net.SocketException;
-import java.util.HashSet;
-import java.util.PriorityQueue;
-import java.util.Queue;
-import java.util.Set;
+import java.util.HashMap;
+import java.util.Map;
+
+import game.*;
 
 public class Lobby {
 
@@ -37,12 +37,14 @@ public class Lobby {
 	private final int MAX_PACKET_SIZE = 1024;
 	private byte[] receivedDataBuffer;
 	private byte[] inGameInfoForAllOtherPlayers = new byte[10];
+	Game gameProcesser;
 
-	private Set<ServerClient> clients = new HashSet<ServerClient>();
-	private Queue<ServerClient> clientsQueue = new PriorityQueue<ServerClient>();
+	private Map<Integer, ServerClient> clients = new HashMap<Integer, ServerClient>();
 	// DataProcessor dataProcessor=new DataProcessor();
 
 	public Lobby(GameType gameType, int lobbyPort) {
+		// !!! provide lobby port; I will try to implement this without providing the lobby port
+		// now, I will socket
 
 		this.gameType = gameType;
 		this.lobbyPort = lobbyPort;
@@ -51,18 +53,22 @@ public class Lobby {
 
 		case ARCADE:
 			MAX_NR_PLAYERS_IN_LOBBY = 10;
+			gameProcesser = new ArcadeGameProcesser(this.gameType);
 			break;
 
-		case DEATH_MATCH:
+		case BATTLE_ROYALE:
 			MAX_NR_PLAYERS_IN_LOBBY = 10;
+			gameProcesser = new BattleRoyaleGameProcesser(this.gameType);
 			break;
 
 		case CAPTURE_THE_FLAG:
 			MAX_NR_PLAYERS_IN_LOBBY = 10;
+			gameProcesser = new CaptureTheFlagGameProcesser(this.gameType);
 			break;
 
 		case ZOMBIE_INVASION:
 			MAX_NR_PLAYERS_IN_LOBBY = 5;
+			gameProcesser = new ZombieInvasionGameProcesser(this.gameType);
 			break;
 
 		default:
@@ -76,7 +82,16 @@ public class Lobby {
 	public void start() {
 
 		try {
-			socket = new DatagramSocket(lobbyPort);
+			// Constructs a datagram socket and binds it to the specified port on the local
+			// host machine.
+			// The socket will be bound to the wild card address,an IP address chosen by the
+			// kernel.
+			
+			// socket = new DatagramSocket(lobbyPort);
+			
+			// !!!!!!!! I try not to provide a port
+			socket = new DatagramSocket();
+			
 		} catch (SocketException e) {
 			e.printStackTrace();
 			return;
@@ -101,75 +116,132 @@ public class Lobby {
 		while (listening) {
 
 			packet = new DatagramPacket(receivedDataBuffer, MAX_PACKET_SIZE);
-			System.out.println("aaaa");
+
 			try {
-				System.out.println("bbb");
+
 				socket.receive(packet);
-				System.out.println("ccc");
+				inspectPacket(packet);
 			} catch (IOException e) {
-				System.out.println("ddd");
+
 				e.printStackTrace();
-				System.out.println("eee");
 			}
-			System.out.println("fff");
+		}
+	}
+
+	private void inspectPacket(DatagramPacket packet) {
+
+		processPacket(packet);
+
+		String dataString = new String(packet.getData());
+
+		PacketIntention packetIntention = getPacketIntention(dataString); // collect packet intention
+		packet.setData(dataString.substring(dataString.indexOf(' ') + 1, dataString.toString().length()).getBytes());
+		// now, since we have collected the packet intention, we shrink the packet's
+		// data, by ignoring the intention information
+
+		switch (packetIntention) {
+
+		case JOIN_LOBBY: // request to join lobby
+
 			if (gameHasStarted == false) {
-				assignConnectionPacketToCorrectPlayer(packet);
-				
-				int id= new Byte(packet.getData()[0]).intValue();
-				System.out.println(id);
+
+				connectPlayer(packet);
 			}
+
+			break;
+
+		case IN_GAME_INFO: // in game information
 
 			// TODO send these information to all other players
-			else {
+			if (gameHasStarted == true) {
+				gameProcesser.processReceivedData(packet.getData());
 				sendPacketToAllOtherPlayers(packet);
+
+				if (gameProcesser.gameHasEnded()) {
+					this.endGame();
+					gameProcesser.retrieveEndGameStatistics();
+					System.gc();
+				}
 			}
 
-			// processPacket(packet);
+			break;
+
+		case RESIDUAL:
+
+			break;
+
+		default: // residual
+			break;
 		}
 	}
 
-	private void assignConnectionPacketToCorrectPlayer(DatagramPacket packet) {
+	private PacketIntention getPacketIntention(String dataString) {
+		// every packet sent by players MUST have an intention: an int which signifies
+		// whether:
+		// the user wants to log in (0)
+		// the user wants to join the lobby - it is looking forward to connect to a
+		// available game (1)
+		// the user wants to send information about the game - its coordinates, swings
+		// sword, etc(2)
+		// also, it is possible that the server recived a residual packet which has
+		// nothing to do with anything
 
-		for (ServerClient clientWaitingForApproval : clientsQueue) {
+		switch (dataString.substring(0, dataString.indexOf(' '))) {
 
-			if (clientSentBackCorrectConnectionPacket(clientWaitingForApproval, packet)) {
+		case "0":
+			return PacketIntention.RECEIVE_ACCOUNT_UPON_LOG_IN;
 
-				this.clients.add(clientWaitingForApproval);
-				this.clientsQueue.remove(clientWaitingForApproval);
-			} else if (clientWaitingForApproval.getOutFromLobbyTimeInSeconds(System.nanoTime()) > 60) {
+		case "1":
+			return PacketIntention.JOIN_LOBBY;
 
-				// if it did not respond to connection test within 1 minute, we kick it out from
-				// lobby
-				clientsQueue.remove(clientWaitingForApproval);
-			}
+		case "2":
+			return PacketIntention.IN_GAME_INFO;
+
+		default:
+			return PacketIntention.RESIDUAL;
 		}
 	}
 
-	private boolean clientSentBackCorrectConnectionPacket(ServerClient clientWaitingForApproval,
-			DatagramPacket packet) {
+	private AddClientToLobbyQueueStatus connectPlayer(DatagramPacket packet) {
 
-		// checks if packet's address is the same with client's address
-		// if packet's port is the same with client's port
-		// if the message sent by the client matches his id
+		if (this.clients.size() + 1 > this.MAX_NR_PLAYERS_IN_LOBBY) {
+			// we won't add the player, the maximum size of the lobby is already reached
+			// ERROR OVERFLOW
+			System.out.println("ERROR " + this.clients.size() + 1);
+			return AddClientToLobbyQueueStatus.OVERFLOW;
+		} else {
+			System.out.println("HERE");
+			int playerID = Integer.parseInt(new String(packet.getData()));
 
-		return (packet.getAddress() == clientWaitingForApproval.getClientAddress()
-				&& packet.getPort() == clientWaitingForApproval.getClientPort()
-				&& new String(packet.getData()).equals(Integer.toString(clientWaitingForApproval.getPlayerID())));
+			this.clients.put(playerID, new ServerClient(playerID, packet.getAddress(), packet.getPort()));
+
+			// TO DO -> SEND BACK TO THE CLIENT A CONNECTED TO LOBBY MESSAGE
+			send(new String("CONNECTED TO LOBBY").getBytes(), packet.getAddress(), packet.getPort());
+			System.out.println("CONNECTED TO LOBBY");
+			if (this.clients.size() == this.MAX_NR_PLAYERS_IN_LOBBY) {
+				gameHasStarted = true;
+			}
+
+			return AddClientToLobbyQueueStatus.SUCCESS;
+		}
 	}
 
 	private void sendPacketToAllOtherPlayers(DatagramPacket packet) {
 
 		inGameInfoForAllOtherPlayers = packet.getData();
-		InetAddress clientAddress = packet.getAddress();
-		int clientPort = packet.getPort();
+		InetAddress receiverClientAddress = packet.getAddress();
+		int receiverClientPort = packet.getPort();
 
-		for (ServerClient client : this.clients) {
+		// now iterate through all clients and send them the information
 
-			if (client.getClientAddress() == clientAddress && client.getClientPort() == clientPort) {
+		for (ServerClient client : clients.values()) {
+
+			if (client.getClientAddress() == receiverClientAddress && client.getClientPort() == receiverClientPort) {
 				// DO NOTHING
-			} else {
+			} else { // for all others players
 
-				send(inGameInfoForAllOtherPlayers, clientAddress, clientPort);
+				send(inGameInfoForAllOtherPlayers, client.getClientAddress(), client.getClientPort()); // send
+																										// information
 			}
 		}
 	}
@@ -233,49 +305,16 @@ public class Lobby {
 		return (this.lobbyPort != -1 && this.lobbyAddress != null);
 	}
 
-	public AddClientToLobbyQueueStatus addClient(ServerClient client) {
+	private void endGame() {
+		// a method which ends the lobby and the listening thread
+		//
 
-		if (this.clients.size() + 1 > this.MAX_NR_PLAYERS_IN_LOBBY) {
-			// we won't add the player, the maximum size of the lobby is already reached
-			// ERROR OVERFLOW
+		this.listening = false;
+		this.listenThread.interrupt(); // interrupts the thread
 
-			return AddClientToLobbyQueueStatus.OVERFLOW;
-		} else {
+		for (ServerClient client : clients.values()) { // send a message to all players - game ended
 
-			client.timeItEnteredLobby = System.nanoTime();
-			testConnection(client);
-			clientsQueue.add(client);
-			return AddClientToLobbyQueueStatus.SUCCESS;
+			send(new String("END").getBytes(), client.getClientAddress(), client.getClientPort());
 		}
-	}
-
-//	public AddClientToLobbyQueueStatus addParty(Set<ServerClient> party) {
-//
-//		if (this.clients.size() + party.size() > this.MAX_NR_PLAYERS_IN_LOBBY) {
-//			// we won't add the party
-//			// ERROR OVERFLOW
-//
-//			return AddClientToLobbyQueueStatus.OVERFLOW;
-//		} else {
-//
-//			for (ServerClient clientInParty : party) {
-//				testConnection(clientInParty);
-//			}
-//
-//			return AddClientToLobbyQueueStatus.SUCCESS;
-//		}
-//	}
-
-	/*
-	 * sends a connection packet to the user in order to connect to lobby, the user
-	 * must send back a similar message
-	 */
-
-	private void testConnection(ServerClient client) {
-		// TODO Auto-generated method stub
-		byte[] testPacket = new StringBuilder().append("Test Client\nid = ").append(client.getPlayerID())
-				.append("\nname = ").append(client.getPlayerName()).toString().getBytes();
-
-		send(testPacket, client.getClientAddress(), client.getClientPort());
 	}
 }
