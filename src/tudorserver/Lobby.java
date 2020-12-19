@@ -43,7 +43,8 @@ public class Lobby {
 	// DataProcessor dataProcessor=new DataProcessor();
 
 	public Lobby(GameType gameType, int lobbyPort) {
-		// !!! provide lobby port; I will try to implement this without providing the lobby port
+		// !!! provide lobby port; I will try to implement this without providing the
+		// lobby port
 		// now, I will socket
 
 		this.gameType = gameType;
@@ -86,12 +87,12 @@ public class Lobby {
 			// host machine.
 			// The socket will be bound to the wild card address,an IP address chosen by the
 			// kernel.
-			
+
 			// socket = new DatagramSocket(lobbyPort);
-			
+
 			// !!!!!!!! I try not to provide a port
-			socket = new DatagramSocket();
-			
+			socket = new DatagramSocket(lobbyPort);
+
 		} catch (SocketException e) {
 			e.printStackTrace();
 			return;
@@ -133,11 +134,11 @@ public class Lobby {
 		processPacket(packet);
 
 		String dataString = new String(packet.getData());
-
-		PacketIntention packetIntention = getPacketIntention(dataString); // collect packet intention
-		packet.setData(dataString.substring(dataString.indexOf(' ') + 1, dataString.toString().length()).getBytes());
-		// now, since we have collected the packet intention, we shrink the packet's
-		// data, by ignoring the intention information
+		String[] packetInfo = removeSpacesFromStrings(dataString.split(" ")); // every information will be splitted and
+																				// placed in a String array
+		System.out.println(packetInfo[0].length());
+		System.out.println(packetInfo[1].length());
+		PacketIntention packetIntention = getPacketIntention(packetInfo[0]); // collect packet intention
 
 		switch (packetIntention) {
 
@@ -145,7 +146,7 @@ public class Lobby {
 
 			if (gameHasStarted == false) {
 
-				connectPlayer(packet);
+				connectPlayer(packet, packetInfo);
 			}
 
 			break;
@@ -154,7 +155,8 @@ public class Lobby {
 
 			// TODO send these information to all other players
 			if (gameHasStarted == true) {
-				gameProcesser.processReceivedData(packet.getData());
+				
+				gameProcesser.processReceivedData(packetInfo);
 				sendPacketToAllOtherPlayers(packet);
 
 				if (gameProcesser.gameHasEnded()) {
@@ -175,6 +177,15 @@ public class Lobby {
 		}
 	}
 
+	private String[] removeSpacesFromStrings(String[] splitResult) {
+
+		for (int i = 0; i < splitResult.length; i++) {
+			splitResult[i].replace(" ", "");
+		}
+
+		return splitResult;
+	}
+
 	private PacketIntention getPacketIntention(String dataString) {
 		// every packet sent by players MUST have an intention: an int which signifies
 		// whether:
@@ -186,7 +197,7 @@ public class Lobby {
 		// also, it is possible that the server recived a residual packet which has
 		// nothing to do with anything
 
-		switch (dataString.substring(0, dataString.indexOf(' '))) {
+		switch (dataString) {
 
 		case "0":
 			return PacketIntention.RECEIVE_ACCOUNT_UPON_LOG_IN;
@@ -202,22 +213,38 @@ public class Lobby {
 		}
 	}
 
-	private AddClientToLobbyQueueStatus connectPlayer(DatagramPacket packet) {
+	private AddClientToLobbyQueueStatus connectPlayer(DatagramPacket packet, String[] packetInfo) {
 
 		if (this.clients.size() + 1 > this.MAX_NR_PLAYERS_IN_LOBBY) {
 			// we won't add the player, the maximum size of the lobby is already reached
 			// ERROR OVERFLOW
 			System.out.println("ERROR " + this.clients.size() + 1);
 			return AddClientToLobbyQueueStatus.OVERFLOW;
-		} else {
-			System.out.println("HERE");
-			int playerID = Integer.parseInt(new String(packet.getData()));
 
-			this.clients.put(playerID, new ServerClient(playerID, packet.getAddress(), packet.getPort()));
+		} else {
+
+			int playerID = -1;
+
+			try {
+				playerID = Integer.parseInt(packetInfo[1]);
+				System.out.println("player ID = " + playerID);
+			} catch (NumberFormatException nrFormatEx) {
+				System.out.println(nrFormatEx);
+				return AddClientToLobbyQueueStatus.WRONG_ID;
+			}
+
+			// check if this player
+			/*
+			 * 1. exists 2. is not a duplicate (hasn't already been introduced in the lobby)
+			 * 3. retrieve player's username 4. optionally: not big level difference, same
+			 * rank etc
+			 */
+				this.clients.put(playerID, new ServerClient(playerID, packet.getAddress(), packet.getPort()));
 
 			// TO DO -> SEND BACK TO THE CLIENT A CONNECTED TO LOBBY MESSAGE
 			send(new String("CONNECTED TO LOBBY").getBytes(), packet.getAddress(), packet.getPort());
 			System.out.println("CONNECTED TO LOBBY");
+			send("TE-AI CONECTAT".getBytes(), packet.getAddress(), packet.getPort());
 			if (this.clients.size() == this.MAX_NR_PLAYERS_IN_LOBBY) {
 				gameHasStarted = true;
 			}
@@ -279,10 +306,12 @@ public class Lobby {
 
 		assert (socket.isConnected());
 
-		DatagramPacket packet = new DatagramPacket(data, 10, clientAddress, clientPort);
+		DatagramPacket packet = new DatagramPacket(data, data.length, clientAddress, clientPort);
 
 		try {
 			socket.send(packet);
+			System.out.println(clientAddress);
+			System.out.println(clientPort);
 		} catch (IOException e) {
 
 			e.printStackTrace();
@@ -307,7 +336,6 @@ public class Lobby {
 
 	private void endGame() {
 		// a method which ends the lobby and the listening thread
-		//
 
 		this.listening = false;
 		this.listenThread.interrupt(); // interrupts the thread

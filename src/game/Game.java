@@ -6,7 +6,7 @@ public abstract class Game {
 
 	public GameType gameType;
 
-	public abstract void processReceivedData(byte [] data);
+	public abstract void processReceivedData(String [] data);
 	public abstract boolean gameHasEnded();
 	public abstract Statistics retrieveEndGameStatistics();
 

@@ -2,7 +2,7 @@ package tudorserver;
 
 import java.net.InetAddress;
 
-import database.AppInfo;
+import database.AppData;
 
 public class ServerClient {
 
@@ -19,7 +19,11 @@ public class ServerClient {
 	public ServerClient(int playerID, InetAddress clientAddress, int clientPort) {
 
 		this.playerID = playerID;
-		this.playerName = AppInfo.getPlayerNameByID(playerID);
+		try {
+			this.playerName = AppData.getPlayerNameByID(playerID);
+		} catch (NullPointerException npe) { // !!! it should not get here. this is just for development
+			this.playerName = "dummy name";
+		}
 		this.playerX = this.playerY = 100;
 
 		this.clientAddress = clientAddress;
