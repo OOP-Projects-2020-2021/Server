@@ -2,11 +2,80 @@ package server;
 
 import java.net.DatagramPacket;
 import java.net.InetAddress;
+import java.util.ArrayList;
+import java.util.Random;
+
+import game.GameType;
+import lobby.Lobby;
 
 public class DataProcessor {
 
-	private InetAddress clientAddress;
-	private int clientPort;
+	protected class ConnectionData {
+
+		private String[] dataForClient = null;
+		public ClientToServerPacketIntention intention = ClientToServerPacketIntention.RESIDUAL;
+
+		public boolean availableLobbyExists = false;
+		public int availableLobbyIndex = -1;
+		public GameType gameType = GameType.RANDOM;
+
+		public boolean signIn = false;
+
+		public boolean signUp = false;
+
+		public boolean buy = false;
+		public int itemID = -1;
+
+		public ConnectionData(ClientToServerPacketIntention intention, String[] dataForClient,
+				boolean availableLobbyExists, GameType gameType, int availableLobbyIndex) {
+
+			this.intention = intention;
+			this.dataForClient = dataForClient;
+			this.availableLobbyExists = availableLobbyExists;
+			this.gameType = gameType;
+			this.availableLobbyIndex = availableLobbyIndex;
+
+			if (this.gameType == GameType.RANDOM) { // if the player selects a random game mode, we will assign a random
+													// game mode for it
+				this.gameType = getRandomGameType();
+			}
+		}
+
+		// TODO - implement all other constructors for signing in/ signing up, buy, etc
+
+		public String[] getDataForClient() {
+			return dataForClient;
+		}
+
+		private GameType getRandomGameType() {
+			// assigning a random game type for the player
+
+			Random rand = new Random();
+			int randomGameType = rand.nextInt(4);
+
+			switch (randomGameType) {
+
+			case 0:
+				return GameType.CAPTURE_THE_FLAG;
+
+			case 1:
+				return GameType.BATTLE_ROYALE;
+
+			case 2:
+				return GameType.ARCADE;
+
+			case 3:
+				return GameType.ZOMBIE_INVASION;
+
+			default:
+				return GameType.ARCADE;
+
+			}
+		}
+	}
+
+	public InetAddress clientAddress;
+	public int clientPort;
 	private String[] packetInfo;
 	private ClientToServerPacketIntention packetIntention;
 
@@ -18,45 +87,83 @@ public class DataProcessor {
 		processPacketIntention(this.packetInfo[0]); // packetIntention is always the first integer in the packet
 	}
 
-	public void processData() {
+	public ConnectionData processData(ArrayList<Lobby> lobby) {
+		// no matter what the intention of the packet is, we will return a packet for
+		// the player
+		ConnectionData connectionData = null;
+
+		System.out.println("entering switch");
+		System.out.println(this.packetIntention);
 
 		switch (this.packetIntention) {
 
 		case SIGN_IN: // 0
-
-			break;
+			return null;
 
 		case SIGN_UP: // 1
-
-			break;
+			return null;
 
 		case BUY: // 2
 
-			break;
+			return null;
 
 		case CONNECT_TO_RANDOM_LOBBY: // 3
-			connectToRandomLobby();
-			break;
+
+			connectionData = searchForAvailableLobby(GameType.RANDOM, lobby);
+
+			if (connectionData != null) {
+				return connectionData;
+			}
+
+			// else create a lobby
+			return createLobby(GameType.RANDOM);
 
 		case CONNECT_TO_BATTLE_ROYALE_LOBBY: // 4
 
-			break;
+			connectionData = searchForAvailableLobby(GameType.BATTLE_ROYALE, lobby);
+
+			if (connectionData != null) {
+				return connectionData;
+			}
+
+			// else create a lobby
+			return createLobby(GameType.BATTLE_ROYALE);
 
 		case CONNECT_TO_CAPTURE_THE_FLAG_LOBBY: // 5
 
-			break;
+			connectionData = searchForAvailableLobby(GameType.CAPTURE_THE_FLAG, lobby);
+
+			if (connectionData != null) {
+				return connectionData;
+			}
+
+			// else create a lobby
+			return createLobby(GameType.CAPTURE_THE_FLAG);
 
 		case CONNECT_TO_ARCADE_LOBBY: // 6
 
-			break;
+			connectionData = searchForAvailableLobby(GameType.ARCADE, lobby);
+
+			if (connectionData != null) {
+				return connectionData;
+			}
+
+			// else create a lobby
+			return createLobby(GameType.ARCADE);
 
 		case CONNECT_TO_ZOMBIE_INVASION_LOBBY: // 7
 
-			break;
+			connectionData = searchForAvailableLobby(GameType.ZOMBIE_INVASION, lobby);
 
-		default: // anything else
+			if (connectionData != null) {
+				return connectionData;
+			}
 
-			break;
+			// else create a lobby
+			return createLobby(GameType.ZOMBIE_INVASION);
+
+		default: // anything else is residual
+			return null;
 		}
 	}
 
@@ -104,12 +211,48 @@ public class DataProcessor {
 		}
 	}
 
-	private void connectToRandomLobby() {
-		/*
-		 * within this method, we will:
-		 * first -> search for an available lobby and return lobby's address and port
-		 * second -> if there is no available lobby, create a lobby
-		 */
+	private ConnectionData searchForAvailableLobby(GameType gameType, ArrayList<Lobby> lobby) {
+		// TODO
+		// iterate through all lobbies and find whether is there one lobby which has not
+		// started and has the appropriate game type or not
+
+		try {
+			for (Lobby currentLobby : lobby) {
+
+				if (!currentLobby.gameHasStarted
+						&& (gameType == GameType.RANDOM || currentLobby.getGameType() == gameType)) {
+
+					byte[] data = createConnectionToLobbyDataPacket();
+
+					String[] connectionDataToClient = new String[10];
+					connectionDataToClient[0] = new StringBuilder("CONNECTED TO LOBBY ").append(gameType.toString())
+							.toString();
+
+					return new ConnectionData(this.packetIntention, connectionDataToClient, true, gameType,
+							currentLobby.lobbyID);
+				}
+			}
+		} catch (NullPointerException npe) {
+			return null;
+		}
+
+		return null;
+	}
+
+	private ConnectionData createLobby(GameType gameType) {
+
+		return new ConnectionData(this.packetIntention, null, false, gameType, -1);
+	}
+
+	private byte[] createConnectionToLobbyDataPacket() {
+		// TODO
+		// packet intention
+		////////// return (new StringBuilder(""));
+		return null;
+	}
+
+	public String[] getPacketInfo() {
+		return this.packetInfo;
 	}
 
 	private void dumpPacket() {

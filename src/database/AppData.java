@@ -5,8 +5,6 @@ import java.sql.Connection;
 import java.util.HashMap;
 import java.util.Map;
 
-import game.Player;
-
 public class AppData {
 	
 	public Map<Integer, Player> players = new HashMap<Integer, Player>();

@@ -1,7 +1,5 @@
-/.classpath
-/.project
-/database/
-/game/
 /tudorserver/
-/lobby/
 /server/
+/lobby/
+/game/
+/database/

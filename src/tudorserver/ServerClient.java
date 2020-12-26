@@ -20,8 +20,12 @@ public class ServerClient {
 
 		this.playerID = playerID;
 		try {
-			this.playerName = AppData.getPlayerNameByID(playerID);
+
+			///////////// this.playerName = AppData.getPlayerNameByID(playerID);
+			this.playerName = "Tudoreeeeel";
+			
 		} catch (NullPointerException npe) { // !!! it should not get here. this is just for development
+
 			this.playerName = "dummy name";
 		}
 		this.playerX = this.playerY = 100;

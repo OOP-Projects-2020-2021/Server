@@ -3,6 +3,8 @@ package tudorserver;
 import java.net.InetAddress;
 import java.net.UnknownHostException;
 
+import game.GameType;
+import lobby.Lobby;
 import server.Server;
 
 public class TudorServer {
@@ -24,7 +26,7 @@ public class TudorServer {
 
 	public TudorServer(int a) {
 
-		Lobby lobby = new Lobby(GameType.ARCADE, 8192);
+		Lobby lobby = new Lobby(GameType.ARCADE, 1);
 		lobby.start();
 //		if (lobby.initLobbyConnection()) {
 //
@@ -36,6 +38,6 @@ public class TudorServer {
 	}
 
 	public static void main(String[] args) {
-		new TudorServer(0);
+		new TudorServer();
 	}
 }

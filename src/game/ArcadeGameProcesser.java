@@ -1,7 +1,5 @@
 package game;
 
-import tudorserver.GameType;
-
 public class ArcadeGameProcesser extends Game {
 
 	private int team0Kills = 0;
@@ -15,8 +13,9 @@ public class ArcadeGameProcesser extends Game {
 	}
 
 	@Override
-	public void processReceivedData(byte[] data) {
+	public void processReceivedData(String[] data) {
 		// TODO Auto-generated method stub
+		// this implementation is just for orientation !!!!!!
 		int playersTeam = getTeamFromData(data.toString());
 
 		if (playersTeam == 0) {

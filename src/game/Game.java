@@ -1,7 +1,5 @@
 package game;
 
-import tudorserver.GameType;
-
 public abstract class Game {
 
 	public GameType gameType;

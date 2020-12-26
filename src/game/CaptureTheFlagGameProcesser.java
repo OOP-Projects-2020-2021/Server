@@ -1,7 +1,5 @@
 package game;
 
-import tudorserver.GameType;
-
 public class CaptureTheFlagGameProcesser extends Game {
 
 	public CaptureTheFlagGameProcesser(GameType gameType) {
@@ -9,9 +7,22 @@ public class CaptureTheFlagGameProcesser extends Game {
 	}
 
 	@Override
-	void processData() {
+	public void processReceivedData(String[] data) {
 		// TODO Auto-generated method stub
-
+		
 	}
+
+	@Override
+	public boolean gameHasEnded() {
+		// TODO Auto-generated method stub
+		return false;
+	}
+
+	@Override
+	public Statistics retrieveEndGameStatistics() {
+		// TODO Auto-generated method stub
+		return null;
+	}
+
 
 }
