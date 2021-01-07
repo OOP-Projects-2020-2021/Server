@@ -27,6 +27,9 @@ import tudorserver.ServerClient;
 
 public class Lobby {
 
+	// THIS VARIABLE IS JUST FOR A SHORT PERIOD OF TIME
+	private boolean team = false;
+
 	public int lobbyID;
 	private GameType gameType = GameType.ARCADE; // by default, it is an arcade game
 	public boolean gameHasStarted = false;
@@ -57,7 +60,7 @@ public class Lobby {
 		switch (this.gameType) {
 
 		case ARCADE:
-			MAX_NR_PLAYERS_IN_LOBBY = 10;
+			MAX_NR_PLAYERS_IN_LOBBY = 2;
 			gameProcesser = new ArcadeGameProcesser(this.gameType);
 			break;
 
@@ -113,7 +116,7 @@ public class Lobby {
 	public int getLobbyPort() {
 		return this.lobbyPort;
 	}
-	
+
 	public String getLobbyAddress() {
 		return this.lobbyAddress.toString();
 	}
@@ -131,7 +134,6 @@ public class Lobby {
 			packet = new DatagramPacket(receivedDataBuffer, MAX_PACKET_SIZE);
 
 			try {
-
 				socket.receive(packet);
 				inspectPacket(packet);
 			} catch (IOException e) {
@@ -148,10 +150,9 @@ public class Lobby {
 		String dataString = new String(packet.getData());
 		String[] packetInfo = removeSpacesFromStrings(dataString.split(" ")); // every information will be splitted and
 																				// placed in a String array
-		System.out.println(packetInfo[0].length());
-		System.out.println(packetInfo[1].length());
-		PacketIntention packetIntention = getPacketIntention(packetInfo[0]); // collect packet intention
 
+		PacketIntention packetIntention = getPacketIntention(packetInfo[0]); // collect packet intention
+		// System.out.println(packetIntention);
 		switch (packetIntention) {
 
 		case JOIN_LOBBY: // request to join lobby
@@ -159,6 +160,9 @@ public class Lobby {
 			if (gameHasStarted == false) {
 
 				connectPlayer(packet, packetInfo);
+
+				// announce other players that a new player is JOINING
+				// sendPacketToAllOtherPlayers(packet);
 			}
 
 			break;
@@ -168,7 +172,8 @@ public class Lobby {
 			// TODO send these information to all other players
 			if (gameHasStarted == true) {
 
-				gameProcesser.processReceivedData(packetInfo);
+				/////////////////////////////////////////////////////////// gameProcesser.processReceivedData(packetInfo);
+				/////////////////////////////////////////////////////////// put it back
 				sendPacketToAllOtherPlayers(packet);
 
 				if (gameProcesser.gameHasEnded()) {
@@ -205,7 +210,7 @@ public class Lobby {
 		// the user wants to join the lobby - it is looking forward to connect to a
 		// available game (1)
 		// the user wants to send information about the game - its coordinates, swings
-		// sword, etc(2)
+		// sword, etc(4)
 		// also, it is possible that the server recived a residual packet which has
 		// nothing to do with anything
 
@@ -217,7 +222,7 @@ public class Lobby {
 		case "1":
 			return PacketIntention.JOIN_LOBBY;
 
-		case "2":
+		case "4":
 			return PacketIntention.IN_GAME_INFO;
 
 		default:
@@ -239,7 +244,6 @@ public class Lobby {
 
 			try {
 				playerID = Integer.parseInt(packetInfo[1]);
-				System.out.println("player ID = " + playerID);
 			} catch (NumberFormatException nrFormatEx) {
 				System.out.println(nrFormatEx);
 				return AddClientToLobbyQueueStatus.WRONG_ID;
@@ -253,9 +257,18 @@ public class Lobby {
 			 */
 			this.clients.put(playerID, new ServerClient(playerID, packet.getAddress(), packet.getPort()));
 
-			// TO DO -> SEND BACK TO THE CLIENT A CONNECTED TO LOBBY MESSAGE
-			send(new String("CONNECTED TO LOBBY").getBytes(), packet.getAddress(), packet.getPort());
-			System.out.println("CONNECTED TO LOBBY");
+			if (team) {
+				send(new String("2 0 STOP").getBytes(), packet.getAddress(), packet.getPort()); // 2 means, for the
+																								// client,
+				// CONNECTED TO LOBBY
+
+				team = !team;
+			} else {
+				send(new String("2 1 STOP").getBytes(), packet.getAddress(), packet.getPort()); // 2 means, for the
+				// client,
+				// CONNECTED TO LOBBY
+				team = !team;
+			}
 
 			if (this.clients.size() == this.MAX_NR_PLAYERS_IN_LOBBY) {
 				gameHasStarted = true;
@@ -295,7 +308,7 @@ public class Lobby {
 		InetAddress clientAddress = packet.getAddress();
 		int clientPort = packet.getPort();
 
-		dumpPacket(packet);
+		// dumpPacket(packet);
 	}
 
 	private void dumpPacket(DatagramPacket packet) {
@@ -322,8 +335,6 @@ public class Lobby {
 
 		try {
 			socket.send(packet);
-			System.out.println(clientAddress);
-			System.out.println(clientPort);
 		} catch (IOException e) {
 
 			e.printStackTrace();
@@ -342,7 +353,7 @@ public class Lobby {
 			// TODO Auto-generated catch block
 			e.printStackTrace();
 		}
-		System.out.println(this.lobbyPort + "   " + this.lobbyAddress);
+
 		return (this.lobbyPort != -1 && this.lobbyAddress != null);
 	}
 

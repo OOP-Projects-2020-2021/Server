@@ -5,6 +5,7 @@ import java.net.DatagramPacket;
 import java.net.DatagramSocket;
 import java.net.InetAddress;
 import java.net.SocketException;
+import java.net.UnknownHostException;
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
@@ -18,7 +19,7 @@ import server.DataProcessor.ConnectionData;
 
 public class Server {
 
-	private int serverPort;
+	private int serverPort = 8192;
 	private Thread listenThread;
 	private volatile boolean listening = false;
 	private DatagramSocket socket;
@@ -28,22 +29,26 @@ public class Server {
 	private byte[] receivedDataBuffer = new byte[MAX_PACKET_SIZE * MAX_NR_PACKETS_RECEIVED_AT_ONE_MOMENT];
 
 	private AppData appData;
+	private Database database = new Database();
 
 	private int lastLobbyID = 0;
 	private ArrayList<Lobby> lobby = new ArrayList<Lobby>();
 
 	public Server(int serverPort) {
 
-		this.serverPort = serverPort;
-
-		Database database = new Database();
+		//////////////////// this.serverPort = serverPort;
 		this.appData = database.retrieveAppData();
 	}
 
 	public void start() {
 
 		try {
-			socket = new DatagramSocket(serverPort);
+			try {
+				socket = new DatagramSocket(serverPort, InetAddress.getByName("192.168.0.109"));
+			} catch (UnknownHostException e) {
+
+				e.printStackTrace();
+			}
 		} catch (SocketException e) {
 			e.printStackTrace();
 			return;
@@ -67,17 +72,17 @@ public class Server {
 			DatagramPacket packet = new DatagramPacket(receivedDataBuffer, MAX_PACKET_SIZE);
 			try {
 				socket.receive(packet);
+				processPacket(packet);
 			} catch (IOException e) {
 				e.printStackTrace();
 			}
-
-			processPacket(packet);
 		}
 	}
 
 	private void processPacket(DatagramPacket packet) {
 
-		System.out.println("processing packet");
+		System.out.println("server is processing the packet");
+		System.out.println(new String(packet.getData()));
 		DataProcessor dataProcessor = new DataProcessor(packet);
 		ConnectionData connectionData = dataProcessor.processData(lobby);
 
@@ -91,13 +96,21 @@ public class Server {
 																									// to the lobby
 			} else { // the player will join the lobby
 
-				lobby.get(connectionData.availableLobbyIndex).connectPlayer(packet, dataProcessor.getPacketInfo()); // connect the player to the lobby
+				lobby.get(connectionData.availableLobbyIndex).connectPlayer(packet, dataProcessor.getPacketInfo());
+				// connect the player to the lobby
 			}
 		} else if (connectionData.intention == ClientToServerPacketIntention.BUY) {
 
 		} else if (connectionData.intention == ClientToServerPacketIntention.SIGN_IN) {
-
+			if (this.appData.playerExists(connectionData.username, connectionData.password)) {
+				// 1 means to the player -> sign in
+				send("1 STOP".getBytes(), packet.getAddress(), packet.getPort());
+			}
 		} else if (connectionData.intention == ClientToServerPacketIntention.SIGN_UP) {
+
+			this.appData.addPlayer(connectionData.username, connectionData.password);
+			// 0 means to the player -> sign up
+			send("0 STOP".getBytes(), packet.getAddress(), packet.getPort());
 
 		} else if (connectionData.intention == ClientToServerPacketIntention.RESIDUAL) {
 

@@ -10,14 +10,16 @@ import lobby.Lobby;
 
 public class DataProcessor {
 
-	protected class ConnectionData {
+	public class ConnectionData {
 
 		private String[] dataForClient = null;
+		public String username = "";
+		public String password = "";
 		public ClientToServerPacketIntention intention = ClientToServerPacketIntention.RESIDUAL;
 
 		public boolean availableLobbyExists = false;
 		public int availableLobbyIndex = -1;
-		public GameType gameType = GameType.RANDOM;
+		public GameType gameType = GameType.ARCADE; //////////////////////////////////// era initial GameType.RANDOM
 
 		public boolean signIn = false;
 
@@ -27,7 +29,9 @@ public class DataProcessor {
 		public int itemID = -1;
 
 		public ConnectionData(ClientToServerPacketIntention intention, String[] dataForClient,
-				boolean availableLobbyExists, GameType gameType, int availableLobbyIndex) {
+				boolean availableLobbyExists, GameType gameType, int availableLobbyIndex) { // constructor for joining
+																							// lobby ; i think ->
+																							// currently unused
 
 			this.intention = intention;
 			this.dataForClient = dataForClient;
@@ -39,6 +43,15 @@ public class DataProcessor {
 													// game mode for it
 				this.gameType = getRandomGameType();
 			}
+		}
+
+		public ConnectionData(ClientToServerPacketIntention intention, boolean signIn, boolean signUp, String username,
+				String password) {
+			this.signUp=signUp;
+			this.signIn = signIn;
+			this.intention = intention;
+			this.username = username;
+			this.password = password;
 		}
 
 		// TODO - implement all other constructors for signing in/ signing up, buy, etc
@@ -91,17 +104,13 @@ public class DataProcessor {
 		// no matter what the intention of the packet is, we will return a packet for
 		// the player
 		ConnectionData connectionData = null;
-
-		System.out.println("entering switch");
-		System.out.println(this.packetIntention);
-
 		switch (this.packetIntention) {
 
-		case SIGN_IN: // 0
-			return null;
+		case SIGN_UP: // 0
+			return new ConnectionData(ClientToServerPacketIntention.SIGN_UP, false, true, packetInfo[1], packetInfo[2]);
 
-		case SIGN_UP: // 1
-			return null;
+		case SIGN_IN: // 1
+			return new ConnectionData(ClientToServerPacketIntention.SIGN_IN, true, false, packetInfo[1], packetInfo[2]);
 
 		case BUY: // 2
 
@@ -173,12 +182,12 @@ public class DataProcessor {
 
 		switch (packetIntentionInt) {
 
-		case 0: // SIGN_IN
-			this.packetIntention = ClientToServerPacketIntention.SIGN_IN;
+		case 0: // SIGN_UP
+			this.packetIntention = ClientToServerPacketIntention.SIGN_UP;
 			break;
 
-		case 1: // SIGN_UP
-			this.packetIntention = ClientToServerPacketIntention.SIGN_UP;
+		case 1: // SIGN_IN
+			this.packetIntention = ClientToServerPacketIntention.SIGN_IN;
 			break;
 
 		case 2: // BUY
